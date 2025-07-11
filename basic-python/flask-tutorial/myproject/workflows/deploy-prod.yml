@@ -1,0 +1,44 @@
+name: Deploy Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: Basic Python
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Collect static assets
+        run: |
+          # If using Flask-Collect or similar
+          flask collect --noinput || echo "No collect step"
+
+      - name: Run database migrations
+        run: flask db upgrade
+
+      - name: Build Docker image
+        run: docker build -t flaskr-app-prod .
+
+      - name: Push Docker image to registry
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          docker tag flaskr-app-prod yourrepo/flaskr-app:prod
+          docker push yourrepo/flaskr-app:prod
+
+      - name: Deploy to production server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }} \
+            'docker pull yourrepo/flaskr-app:prod && docker stop flaskr-app || true && docker rm flaskr-app || true && docker run -d --name flaskr-app -p 80:5000 yourrepo/flaskr-app:prod'

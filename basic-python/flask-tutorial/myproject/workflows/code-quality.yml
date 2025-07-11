@@ -1,0 +1,62 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: Basic Python
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 mypy bandit
+
+      - name: Lint Python with flake8
+        run: flake8 flaskr tests
+
+      - name: Type check with mypy
+        run: mypy flaskr
+
+      - name: Security scan with Bandit
+        run: bandit -r flaskr
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install JS dependencies
+        run: |
+          if [ -f package.json ]; then npm ci; fi
+
+      - name: Lint JavaScript with ESLint
+        run: |
+          if [ -f package.json ]; then npx eslint .; fi
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@v2
+        with:
+          projectBaseDir: .
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Python dependency audit with pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit
+
+      - name: JavaScript dependency audit
+        run: |
+          if [ -f package.json ]; then npm audit --audit-level=high; fi
